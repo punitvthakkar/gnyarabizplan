@@ -1,186 +1,233 @@
-document.addEventListener('DOMContentLoaded', function() {
-    // Theme toggle functionality
-    const themeToggle = document.getElementById('theme-toggle');
-    const body = document.body;
+// DOM Elements
+const themeToggle = document.getElementById('theme-toggle');
+const menuToggle = document.getElementById('menu-toggle');
+const navMenu = document.getElementById('main-nav');
+const navLinks = document.querySelectorAll('.nav-link');
+const sections = document.querySelectorAll('.content-section');
+const animatedElements = document.querySelectorAll('.fade-in, .slide-in-left, .slide-in-right');
+
+// Initialize the application
+document.addEventListener('DOMContentLoaded', () => {
+    initTheme();
+    initMenu();
+    initNavigation();
+    initScrollAnimations();
+    initFinancialChart();
+});
+
+// Theme Functionality
+function initTheme() {
+    // Check for saved theme preference or use default
+    const savedTheme = localStorage.getItem('theme') || 'light-mode';
+    document.body.className = savedTheme;
+    updateThemeIcon();
+
+    // Theme toggle event listener
+    themeToggle.addEventListener('click', toggleTheme);
+}
+
+function toggleTheme() {
+    const currentTheme = document.body.className;
+    const newTheme = currentTheme === 'light-mode' ? 'dark-mode' : 'light-mode';
     
-    // Check for saved theme preference or respect OS preference
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-      body.classList.add('dark-mode');
-    }
+    document.body.className = newTheme;
+    localStorage.setItem('theme', newTheme);
     
-    themeToggle.addEventListener('click', function() {
-      body.classList.toggle('dark-mode');
-      const theme = body.classList.contains('dark-mode') ? 'dark' : 'light';
-      localStorage.setItem('theme', theme);
+    updateThemeIcon();
+}
+
+function updateThemeIcon() {
+    const isDarkMode = document.body.className === 'dark-mode';
+    themeToggle.innerHTML = isDarkMode ? 
+        '<i class="fas fa-sun"></i>' : 
+        '<i class="fas fa-moon"></i>';
+}
+
+// Mobile Menu Functionality
+function initMenu() {
+    menuToggle.addEventListener('click', () => {
+        navMenu.classList.toggle('active');
+        menuToggle.innerHTML = navMenu.classList.contains('active') ?
+            '<i class="fas fa-times"></i>' :
+            '<i class="fas fa-bars"></i>';
     });
-    
-    // Expandable sections
-    const expandableSections = document.querySelectorAll('.expandable-section');
-    expandableSections.forEach(section => {
-      const header = section.querySelector('.expandable-header');
-      header.addEventListener('click', () => {
-        section.classList.toggle('active');
-      });
+
+    // Close menu when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!navMenu.contains(e.target) && e.target !== menuToggle) {
+            navMenu.classList.remove('active');
+            menuToggle.innerHTML = '<i class="fas fa-bars"></i>';
+        }
     });
-    
-    // Scroll animations
-    const sections = document.querySelectorAll('.section');
-    const navLinks = document.querySelectorAll('.section-nav a');
-    
-    // Initial visibility check
-    checkVisibility();
-    
-    // Listen for scroll events
-    window.addEventListener('scroll', () => {
-      checkVisibility();
-      updateActiveNavLink();
-    });
-    
-    // Smooth scrolling for navigation links
+
+    // Close menu when clicking on a nav link on mobile
     navLinks.forEach(link => {
-      link.addEventListener('click', function(e) {
-        e.preventDefault();
-        const targetId = this.getAttribute('href');
-        const targetSection = document.querySelector(targetId);
-        
-        window.scrollTo({
-          top: targetSection.offsetTop - 80, // Offset for header
-          behavior: 'smooth'
+        link.addEventListener('click', () => {
+            if (window.innerWidth <= 992) {
+                navMenu.classList.remove('active');
+                menuToggle.innerHTML = '<i class="fas fa-bars"></i>';
+            }
         });
-      });
     });
+}
+
+// Smooth Scrolling and Navigation Highlighting
+function initNavigation() {
+    // Add smooth scrolling to all nav links
+    navLinks.forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            
+            const targetId = link.getAttribute('href');
+            const targetElement = document.querySelector(targetId);
+            
+            if (targetElement) {
+                const offsetTop = targetElement.getBoundingClientRect().top + window.pageYOffset;
+                
+                window.scrollTo({
+                    top: offsetTop,
+                    behavior: 'smooth'
+                });
+            }
+        });
+    });
+
+    // Highlight active nav link on scroll
+    window.addEventListener('scroll', debounce(highlightNavLink, 100));
     
-    // Check if sections are visible and animate them
-    function checkVisibility() {
-      const triggerPoint = window.innerHeight * 0.8;
-      
-      sections.forEach(section => {
-        const sectionTop = section.getBoundingClientRect().top;
-        
-        if (sectionTop < triggerPoint) {
-          section.classList.add('visible');
-        }
-      });
-    }
+    // Initial highlight
+    highlightNavLink();
+}
+
+function highlightNavLink() {
+    let scrollPosition = window.scrollY + 100;
     
-    // Update active navigation link based on scroll position
-    function updateActiveNavLink() {
-      let currentSection = '';
-      
-      sections.forEach(section => {
+    // Get all sections and find the one currently in view
+    sections.forEach(section => {
         const sectionTop = section.offsetTop;
-        const sectionHeight = section.offsetHeight;
+        const sectionHeight = section.clientHeight;
+        const sectionId = section.getAttribute('id');
         
-        if (window.scrollY >= sectionTop - 100 && window.scrollY < sectionTop + sectionHeight - 100) {
-          currentSection = '#' + section.getAttribute('id');
+        if (scrollPosition >= sectionTop && scrollPosition < sectionTop + sectionHeight) {
+            // Remove active class from all links
+            navLinks.forEach(link => {
+                link.classList.remove('active');
+            });
+            
+            // Add active class to current section link
+            const activeLink = document.querySelector(`.nav-link[href="#${sectionId}"]`);
+            if (activeLink) {
+                activeLink.classList.add('active');
+            }
         }
-      });
-      
-      navLinks.forEach(link => {
-        link.classList.remove('active');
-        if (link.getAttribute('href') === currentSection) {
-          link.classList.add('active');
-        }
-      });
-    }
+    });
+}
+
+// Scroll Animations
+function initScrollAnimations() {
+    // Initial check for visible elements
+    checkForVisibleElements();
     
-    // Growth chart
-    createGrowthChart();
+    // Check for new visible elements on scroll
+    window.addEventListener('scroll', debounce(checkForVisibleElements, 50));
+}
+
+function checkForVisibleElements() {
+    const triggerHeight = window.innerHeight * 0.85;
     
-    function createGrowthChart() {
-      const canvas = document.getElementById('growthChart');
-      if (!canvas) return;
-      
-      const ctx = canvas.getContext('2d');
-      const width = canvas.parentElement.clientWidth;
-      const height = 300;
-      canvas.width = width;
-      canvas.height = height;
-      
-      // Data points for MRR
-      const months = [0, 1, 2, 3, 4, 5, 6, 7, 8];
-      const mrr = [0, 0, 3, 3, 15, 50, 150, 400, 830];
-      
-      // Chart dimensions
-      const padding = 40;
-      const chartWidth = width - (padding * 2);
-      const chartHeight = height - (padding * 2);
-      
-      // Clear the canvas
-      ctx.clearRect(0, 0, width, height);
-      
-      // Draw the axes
-      ctx.beginPath();
-      ctx.moveTo(padding, padding);
-      ctx.lineTo(padding, height - padding);
-      ctx.lineTo(width - padding, height - padding);
-      ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--text-secondary');
-      ctx.stroke();
-      
-      // Draw the x-axis labels
-      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text-secondary');
-      ctx.font = '12px var(--font-sans)';
-      ctx.textAlign = 'center';
-      
-      for (let i = 0; i < months.length; i++) {
-        const x = padding + (i * (chartWidth / (months.length - 1)));
-        ctx.fillText(`M${months[i]}`, x, height - padding + 20);
-      }
-      
-      // Draw the y-axis labels
-      const maxMRR = Math.max(...mrr);
-      ctx.textAlign = 'right';
-      
-      for (let i = 0; i <= 4; i++) {
-        const y = height - padding - (i * (chartHeight / 4));
-        const value = Math.round((i / 4) * maxMRR);
-        ctx.fillText(`$${value}K`, padding - 10, y + 5);
-      }
-      
-      // Draw the bars
-      const barWidth = (chartWidth / months.length) * 0.6;
-      const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary');
-      
-      for (let i = 0; i < mrr.length; i++) {
-        const x = padding + (i * (chartWidth / (months.length - 1))) - (barWidth / 2);
-        const barHeight = (mrr[i] / maxMRR) * chartHeight;
-        const y = height - padding - barHeight;
+    animatedElements.forEach(element => {
+        const elementTop = element.getBoundingClientRect().top;
         
-        ctx.fillStyle = primaryColor;
-        ctx.fillRect(x, y, barWidth, barHeight);
-        
-        // Add value on top of bars
-        if (mrr[i] > 0) {
-          ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text-primary');
-          ctx.textAlign = 'center';
-          ctx.fillText(`$${mrr[i]}K`, x + (barWidth / 2), y - 10);
+        if (elementTop < triggerHeight) {
+            element.classList.add('visible');
         }
-      }
-      
-      // Draw the line for the target ARR
-      const lineY = height - padding - (chartHeight * (830 / maxMRR));
-      ctx.beginPath();
-      ctx.moveTo(padding, lineY);
-      ctx.lineTo(width - padding, lineY);
-      ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--secondary');
-      ctx.setLineDash([5, 5]);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      
-      // Add label for the target line
-      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--secondary');
-      ctx.textAlign = 'right';
-      ctx.fillText('$10M ARR Target', width - padding - 10, lineY - 10);
-    }
+    });
+}
+
+// Create Financial Chart
+function initFinancialChart() {
+    const ctx = document.getElementById('financial-chart');
     
-    // Update chart on window resize
-    window.addEventListener('resize', function() {
-      createGrowthChart();
+    if (!ctx) return;
+    
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: ['Month 3', 'Month 6', 'Month 9', 'Month 12', 'Year 2', 'Year 3'],
+            datasets: [{
+                label: 'Monthly Recurring Revenue ($K)',
+                data: [0, 15, 45, 75, 180, 350],
+                backgroundColor: 'rgba(99, 102, 241, 0.2)',
+                borderColor: 'rgba(99, 102, 241, 1)',
+                tension: 0.4,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Revenue ($K)'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Timeline'
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: (context) => `$${context.parsed.y}K MRR`
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Add classes to elements for animations
+function addAnimationClasses() {
+    // Add animation classes to sections
+    sections.forEach((section, index) => {
+        const sectionContent = section.querySelector('.section-content');
+        
+        if (index % 2 === 0) {
+            sectionContent.classList.add('slide-in-left');
+        } else {
+            sectionContent.classList.add('slide-in-right');
+        }
     });
     
-    // Update chart on theme change
-    themeToggle.addEventListener('click', function() {
-      setTimeout(createGrowthChart, 50); // Slight delay to allow CSS variables to update
+    // Add fade-in animations to cards and items
+    const cards = document.querySelectorAll('.process-item, .metric, .feature, .moat-item, .funding-round');
+    cards.forEach((card, index) => {
+        card.classList.add('fade-in');
+        card.classList.add(`delay-${(index % 5) + 1}`);
     });
-  });
+}
+
+// Initialize animations after DOM is fully loaded
+window.addEventListener('load', addAnimationClasses);
+
+// Utility Functions
+function debounce(func, wait = 20, immediate = true) {
+    let timeout;
+    return function() {
+        const context = this, args = arguments;
+        const later = function() {
+            timeout = null;
+            if (!immediate) func.apply(context, args);
+        };
+        const callNow = immediate && !timeout;
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+        if (callNow) func.apply(context, args);
+    };
+}
